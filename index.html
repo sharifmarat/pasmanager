@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Password management</title>
+    <link rel="stylesheet" type="text/css" href="css/layout.css">
+    <script src="js/jquery-2.2.3.min.js"></script>
+    <script src="js/clipboard.min.js"></script>
+    <script src="js/jen.js"></script>
+    <script async src="js/openpgp.min.js"></script>
+  </head>
+
+  <script>
+    function resetSoft() {
+      messageHide();
+      $("#username").val("");
+      $("#password").val("");
+    }
+
+    function messageHide() {
+      $("#messagebox").hide();
+    }
+
+    function messageInfo(msg) {
+      var msgbox = $("#messagebox");
+      var msglabel = $("#message");
+      msgbox.removeClass();
+      msglabel.text(msg);
+      msgbox.addClass("messageinfo");
+      msgbox.show();
+    }
+
+    function messageError(msg) {
+      var msgbox = $("#messagebox");
+      var msglabel = $("#message");
+      msgbox.removeClass();
+      msglabel.text(msg);
+      msgbox.addClass("messageerror");
+      msgbox.show();
+    }
+
+    function generatePasswordTo(selector) {
+      var jen = new Jen(true);
+      $(selector).val(jen.password(30, 40));
+    }
+
+    $(document).ready(function(){
+      $("#testmasterpassword").click(function(e){
+        messageHide();
+        e.preventDefault();
+        $.ajax({type: "POST",
+          url: "cgi-bin/getkey.py",
+          data: { id: "test" },
+          success: function(response){
+            var result = JSON.parse(response);
+            if (result.status != 0) {
+              messageError("Cannot test master password:" + result.message);
+            } else {
+              openpgp.decrypt({
+                password: $("#masterpassword").val(),
+                message: openpgp.message.readArmored(result.cipher)
+              }).then(function(decrypted){
+                messageInfo("Master password is correct");
+              }).catch(function(error){
+                messageError("Master password is not correct");
+              });
+            }
+          },
+          error: function(response){
+            messageError("Server error");
+          }
+        });
+      });
+    });
+
+    $(document).ready(function(){
+      $("#getpassword").click(function(e){
+        resetSoft();
+        e.preventDefault();
+        $.ajax({type: "POST",
+          url: "cgi-bin/getkey.py",
+          data: {
+            id: $("#website").val()
+          },
+          success: function(response){
+            var result = JSON.parse(response);
+            if (result.status != 0) {
+              messageError(result.message);
+            } else {
+              messageInfo(result.message);
+              openpgp.decrypt({
+                password: $("#masterpassword").val(),
+                message: openpgp.message.readArmored(result.cipher)
+              }).then(function(decrypted){
+                var credentials = JSON.parse(decrypted.data);
+                $("#username").val(credentials.username);
+                $("#password").val(credentials.password);
+              }).catch(function(error){
+                messageError("Could not decrypt message");
+              });
+            }
+          },
+          error: function(response){
+            messageError("Server error");
+          }
+        });
+      });
+
+      $("#addpassword").click(function(e){
+        messageHide();
+        e.preventDefault();
+
+        var objToEncrypt = {
+          username: $("#username").val(),
+          password: $("#password").val()
+        };
+
+        openpgp.encrypt({
+          data:JSON.stringify(objToEncrypt),
+          passwords:$("#masterpassword").val(),
+          armor: true
+        }).then(function(cipher){ 
+          $.ajax({type: "POST",
+            url: "cgi-bin/addkey.py",
+            data: {
+              id: $("#website").val(),
+              cipher: cipher.data
+            },
+            success: function(response){
+              var result = JSON.parse(response);
+              if (result.status != 0) {
+                messageError(result.message);
+              } else {
+                messageInfo(result.message);
+              }
+            },
+            error: function(response){
+              messageError("Server error");
+            }
+          });
+        }).catch(function(error){
+          messageError("Could not encrypt message");
+        });
+      });
+    });
+
+    $(function () {
+      $(".peekpassword").each(function (index, input) {
+        var $input = $(input);
+        var btn = $input.siblings(".showpassword");
+        btn.click(function () {
+          var change = "";
+          if ($(this).html() === "Show Password") {
+            $(this).html("Hide Password")
+            change = "text";
+          } else {
+            $(this).html("Show Password");
+            change = "password";
+          }
+          var rep = $("<input type='" + change + "' />")
+            .attr("id", $input.attr("id"))
+            .attr("name", $input.attr("name"))
+            .attr('class', $input.attr('class'))
+            .val($input.val())
+            .insertBefore($input);
+          $input.remove();
+          $input = rep;
+        }).insertAfter($input);
+      });
+    });
+
+  </script>
+
+
+  <body>
+
+    <div class="content-wrap">
+
+      <div id="messagebox" class="messageinfo">
+        <span class="messageclose" onclick="this.parentElement.style.display='none';">&times;</span>
+        <label id="message">TODO: some help message here</label>
+      </div>
+    
+      <form id="masterpasswordform" action="javascript:void(0);">
+        <p>
+          <label class="field">Masterpassword:</label>
+          <input id="masterpassword" type="password" name="masterpassword" class="peekpassword">
+          <button type="button" class="showpassword">Show Password</button>
+        </p>
+        <p>
+          <input id="testmasterpassword" type="button" value="Test master password">
+        </p>
+      </form>
+
+      <form id="passwordform" action="javascript:void(0);">
+        <p>
+          <label class="field">Website:</label>
+          <input id="website" type="text" name="website">
+        </p>
+        <p>
+          <label class="field">Username:</label>
+          <input id="username" type="text">
+        </p>
+        <p>
+          <label class="field">Password:</label>
+          <input id="password" type="password" class="peekpassword">
+          <button type="button" class="showpassword">Show Password</button>
+          <input id="genpassword" type="button" value="Generate password" onclick="generatePasswordTo('#password')">
+
+          <button type="button" class="copybtn" data-clipboard-target="#password">
+            Copy to clipboard
+          </button>
+
+        </p>
+        <p>
+          <input id="getpassword" type="button" value="Get">
+          <input id="addpassword" type="button" value="Add">
+        </p>
+      </form>
+
+    </div>
+
+  <script>
+    var clipboard = new Clipboard('.copybtn');
+  </script>
+
+  </body>
+</html>

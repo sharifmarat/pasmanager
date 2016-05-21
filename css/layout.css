@@ -1,0 +1,46 @@
+body {
+  font-family: 'Lora', serif;
+  font-size: 21px;
+  line-height: 1.52;
+  background-color: #f8f8f8;
+  text-rendering: optimizeLegibility;
+}
+
+.content-wrap {
+  width: 38em;
+  margin: 0 auto;
+}
+
+.messageerror {
+  padding: 20px;
+  margin-bottom: 15px;
+  color: white;
+  background-color: #f44336;
+}
+
+.messageinfo {
+  padding: 20px;
+  margin-bottom: 15px;
+  color: white;
+  background-color: #00529B;
+}
+
+.messageclose {
+  margin-left: 15px;
+  color: white;
+  font-weight: bold;
+  float: right;
+  font-size: 22px;
+  line-height: 20px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.messageclose:hover {
+  color: black;
+}
+
+form  { display: table;      }
+p     { display: table-row;  }
+label { display: table-cell; }
+input { display: table-cell; }
