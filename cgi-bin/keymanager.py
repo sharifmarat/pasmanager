@@ -38,7 +38,10 @@ class KeyManager:
                         check(
                             typeof("secret") = "text"
                             AND length("secret") <= 64),
-                    last_token integer);""")
+                    last_token text not null
+                        check(
+                            typeof("last_token") = "text"
+                            AND length("last_token") <= 64));""")
                         
 
     def getCipher(self, id):
@@ -72,7 +75,7 @@ class KeyManager:
             if not values:
                 return None
             else:
-                return (values[0], str(values[1]))
+                return (values[0], values[1])
         except sqlite3.IntegrityError as e:
             print(e, file=sys.stderr)
             return None
@@ -83,7 +86,7 @@ class KeyManager:
     def addOtp(self, id, secret):
         try:
             with self.__connection:
-                self.__cursor.execute('insert into otp values(?, ?, ?)', (id, secret, 0))
+                self.__cursor.execute('insert into otp values(?, ?, ?)', (id, secret, ""))
             return True
         except sqlite3.IntegrityError as e:
             print(e, file=sys.stderr)
