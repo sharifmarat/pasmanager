@@ -50,7 +50,10 @@
         e.preventDefault();
         $.ajax({type: "POST",
           url: "cgi-bin/getkey.py",
-          data: { id: "test" },
+          data: {
+            id: "test",
+            token: $("#token").val()
+          },
           success: function(response){
             var result = JSON.parse(response);
             if (result.status != 0) {
@@ -80,7 +83,8 @@
         $.ajax({type: "POST",
           url: "cgi-bin/getkey.py",
           data: {
-            id: $("#website").val()
+            id: $("#website").val(),
+            token: $("#token").val()
           },
           success: function(response){
             var result = JSON.parse(response);
@@ -125,6 +129,7 @@
             url: "cgi-bin/addkey.py",
             data: {
               id: $("#website").val(),
+              token: $("#token").val(),
               cipher: cipher.data
             },
             success: function(response){
@@ -179,7 +184,7 @@
 
       <div id="messagebox" class="messageinfo">
         <span class="messageclose" onclick="this.parentElement.style.display='none';">&times;</span>
-        <label id="message">TODO: some help message here</label>
+        <label id="message">Each token can be used only once</label>
       </div>
     
       <form id="masterpasswordform" action="javascript:void(0);">
@@ -187,6 +192,10 @@
           <label class="field">Masterpassword:</label>
           <input id="masterpassword" type="password" name="masterpassword" class="peekpassword">
           <button type="button" class="showpassword">Show Password</button>
+        </p>
+        <p>
+          <label class="field">Token:</label>
+          <input id="token" type="text">
         </p>
         <p>
           <input id="testmasterpassword" type="button" value="Test master password">

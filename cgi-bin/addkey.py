@@ -13,7 +13,7 @@ if not os.environ.get('KEY_DB'):
     sys.exit()
 
 form = cgi.FieldStorage()
-if "id" not in form or "cipher" not in form:
+if "id" not in form or "cipher" not in form or "token" not in form:
     print("Content-Type: text/plain\n")
     print(json.dumps({'status': 1, 'message': 'Request is not correct'}))
     sys.exit()
@@ -21,12 +21,20 @@ if "id" not in form or "cipher" not in form:
 db = os.environ.get('KEY_DB')
 id = form.getfirst("id")
 cipher = form.getfirst("cipher")
+token = form.getfirst("token")
 
+from auth import tryToken
 from keymanager import KeyManager
 with KeyManager(db) as keys:
+    if not tryToken(token, keys):
+        print("Content-Type: text/plain\n")
+        print(json.dumps({'status': 1, 'message': 'Auth failed'}))
+        sys.exit()
+
     if keys.addCipher(id, cipher):
         print("Content-Type: text/plain\n")
         print(json.dumps({'status': 0, 'message': 'Add done'}))
     else:
         print("Content-Type: text/plain\n")
         print(json.dumps({'status': 1, 'message': 'Could not update database'}))
+
