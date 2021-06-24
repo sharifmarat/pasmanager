@@ -2,12 +2,20 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Password management</title>
-    <link rel="stylesheet" type="text/css" href="css/layout.css">
-    <script src="js/jquery-2.2.3.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+
+    <!--<link rel="stylesheet" type="text/css" href="css/layout.css">
+    <script src="js/jquery-2.2.3.min.js"></script>-->
     <script src="js/clipboard.min.js"></script>
     <script src="js/jen.js"></script>
     <script async src="js/openpgp.min.js"></script>
+
+    <title>Password management</title>
   </head>
 
   <script>
@@ -26,7 +34,7 @@
       var msglabel = $("#message");
       msgbox.removeClass();
       msglabel.text(msg);
-      msgbox.addClass("messageinfo");
+      msgbox.addClass("alert alert-primary");
       msgbox.show();
     }
 
@@ -35,7 +43,7 @@
       var msglabel = $("#message");
       msgbox.removeClass();
       msglabel.text(msg);
-      msgbox.addClass("messageerror");
+      msgbox.addClass("alert alert-danger");
       msgbox.show();
     }
 
@@ -48,11 +56,18 @@
       $("#testmasterpassword").click(function(e){
         messageHide();
         e.preventDefault();
+
+        var token = prompt("Enter token:", "");
+        if (token == null || token == "") {
+          messageError("Token is missing");
+          return;
+        }
+
         $.ajax({type: "POST",
           url: "cgi-bin/getkey.py",
           data: {
             id: "test",
-            token: $("#token").val()
+            token: token
           },
           success: function(response){
             var result = JSON.parse(response);
@@ -80,11 +95,18 @@
       $("#getpassword").click(function(e){
         resetSoft();
         e.preventDefault();
+
+        var token = prompt("Enter token:", "");
+        if (token == null || token == "") {
+          messageError("Token is missing");
+          return;
+        }
+
         $.ajax({type: "POST",
           url: "cgi-bin/getkey.py",
           data: {
             id: $("#website").val(),
-            token: $("#token").val()
+            token: token
           },
           success: function(response){
             var result = JSON.parse(response);
@@ -114,6 +136,12 @@
         messageHide();
         e.preventDefault();
 
+        var token = prompt("Enter token:", "");
+        if (token == null || token == "") {
+          messageError("Token is missing");
+          return;
+        }
+
         var objToEncrypt = {
           website: $("#website").val,
           username: $("#username").val(),
@@ -124,12 +152,12 @@
           data:JSON.stringify(objToEncrypt),
           passwords:$("#masterpassword").val(),
           armor: true
-        }).then(function(cipher){ 
+        }).then(function(cipher){
           $.ajax({type: "POST",
             url: "cgi-bin/addkey.py",
             data: {
               id: $("#website").val(),
-              token: $("#token").val(),
+              token: token,
               cipher: cipher.data
             },
             success: function(response){
@@ -180,53 +208,74 @@
 
   <body>
 
-    <div class="content-wrap">
+    <div class="container">
 
-      <div id="messagebox" class="messageinfo">
-        <span class="messageclose" onclick="this.parentElement.style.display='none';">&times;</span>
+      <div id="messagebox" class="alert alert-primary" role="alert">
         <label id="message">Each token can be used only once</label>
+
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
       </div>
     
+
+<ul class="nav nav-tabs" id="navTabs" role="tablist">
+  <li class="nav-item">
+    <a class="nav-link active" id="master-tab" data-toggle="tab" href="#master" role="tab" aria-controls="master" aria-selected="true">Master</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" id="getkeys-tab" data-toggle="tab" href="#getkeys" role="tab" aria-controls="getkeys" aria-selected="false">Get</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" id="addkeys-tab" data-toggle="tab" href="#addkeys" role="tab" aria-controls="addkeys" aria-selected="false">Add</a>
+  </li>
+</ul>
+<div class="tab-content" id="navTabContent">
+  <div class="tab-pane fade show active" id="master" role="tabpanel" aria-labelledby="master-tab">
       <form id="masterpasswordform" action="javascript:void(0);">
-        <p>
-          <label class="field">Masterpassword:</label>
-          <input id="masterpassword" type="password" name="masterpassword" class="peekpassword">
-          <button type="button" class="showpassword">Show Password</button>
-        </p>
-        <p>
-          <label class="field">Token:</label>
-          <input id="token" type="text">
-        </p>
-        <p>
-          <input id="testmasterpassword" type="button" value="Test master password">
-        </p>
+        <div class="form-group">
+          <label for="masterpassword">Masterpassword</label>
+          <input type="password" class="form-control peekpassword" id="masterpassword" aria-describedby="masterHelp" placeholder="Enter psw">
+          <small id="masterHelp" class="form-text text-muted">It is never sent to any server</small>
+          <button id="testmasterpassword" type="submit" class="btn btn-primary">Test master password</button>
+          <button type="button" class="btn btn-secondary showpassword">Show Password</button>
+        </div>
       </form>
+  </div>
 
+  <div class="tab-pane fade" id="getkeys" role="tabpanel" aria-labelledby="getkeys-tab">
+  </div>
+
+  <div class="tab-pane fade" id="addkeys" role="tabpanel" aria-labelledby="addkeys-tab">
       <form id="passwordform" action="javascript:void(0);">
-        <p>
-          <label class="field">Website:</label>
-          <input id="website" type="text" name="website">
-        </p>
-        <p>
-          <label class="field">Username:</label>
-          <input id="username" type="text">
-        </p>
-        <p>
-          <label class="field">Password:</label>
-          <input id="password" type="password" class="peekpassword">
-          <button type="button" class="showpassword">Show Password</button>
-          <input id="genpassword" type="button" value="Generate password" onclick="generatePasswordTo('#password')">
+        <div class="form-group">
+          <label for="website">Website</label>
+          <input type="text" class="form-control" id="website" placeholder="Enter website or selector">
+        </div>
 
-          <button type="button" class="copybtn" data-clipboard-target="#password">
-            Copy to clipboard
-          </button>
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" class="form-control" id="username" placeholder="Enter username">
+        </div>
 
-        </p>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" class="form-control peekpassword" id="password" placeholder="Enter password">
+
+          <button type="button" class="btn btn-secondary showpassword">Show Password</button>
+          <input id="genpassword" type="button" class="btn btn-primary" value="Generate password" onclick="generatePasswordTo('#password')">
+
+          <button type="button" class="copybtn btn btn-secondary" data-clipboard-target="#password">Copy to clipboard</button>
+        </div>
+
         <p>
-          <input id="getpassword" type="button" value="Get">
-          <input id="addpassword" type="button" value="Add">
+          <input id="getpassword" type="button" value="Get" class="btn btn-primary">
+          <input id="addpassword" type="button" value="Add" class="btn btn-primary">
         </p>
       </form>
+  </div>
+</div>
+
 
     </div>
 
