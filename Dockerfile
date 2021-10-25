@@ -12,6 +12,7 @@ RUN apk update && \
     sqlite \
     curl \
     && pip3 install pyotp \
+    && pip3 install Flask \
     && rm -rf /var/cache/apk/* \
     && mkdir -p /var/db \
     && chown lighttpd:lighttpd /var/db

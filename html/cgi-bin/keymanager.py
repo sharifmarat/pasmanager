@@ -101,3 +101,16 @@ class KeyManager:
         except sqlite3.IntegrityError as e:
             print(e, file=sys.stderr)
             return False
+
+    def getList(self):
+        try:
+            ids = []
+            for row in self.__cursor.execute('select id from keys'):
+                ids.append(row)
+            return ids
+        except sqlite3.IntegrityError as e:
+            print(e, file=sys.stderr)
+            return []
+        except sqlite3.OperationalError as e:
+            print(e, file=sys.stderr)
+            return []
