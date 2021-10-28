@@ -11,13 +11,17 @@ RUN apk update && \
     py3-pip \
     sqlite \
     curl \
+    gcc libc-dev libffi-dev python3-dev \
     && pip3 install pyotp \
     && pip3 install Flask \
+    && pip3 install python-dotenv \
+    && pip3 install bcrypt \
     && rm -rf /var/cache/apk/* \
     && mkdir -p /var/db \
     && chown lighttpd:lighttpd /var/db
 
 ADD html /var/www/localhost/
+COPY .env /var/www/localhost/cgi-bin/
 COPY src/* /etc/lighttpd/
 
 HEALTHCHECK --interval=10m --timeout=1s \
