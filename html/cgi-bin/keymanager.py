@@ -42,7 +42,21 @@ class KeyManager:
                         check(
                             typeof("last_token") = "text"
                             AND length("last_token") <= 64));""")
-                        
+
+            self.__cursor.execute("""
+                create table if not exists "users" (
+                    id text primary key not null
+                        check(
+                            typeof("id") = "text" 
+                            AND length("id") <= 64),
+                    token text not null
+                        check(
+                            typeof("token") = "text"
+                            AND length("token") <= 64),
+                    hash text not null
+                        check(
+                            typeof("hash") = "text"
+                            AND length("hash") <= 300));""")
 
     def getCipher(self, id):
         try:
@@ -58,6 +72,30 @@ class KeyManager:
         except sqlite3.OperationalError as e:
             print(e, file=sys.stderr)
             return None
+
+    def getUser(self, id):
+        try:
+            self.__cursor.execute('select token, hash from users where id=?', (id,))
+            res = self.__cursor.fetchone()
+            if not res:
+                return None
+            else:
+                return {'token': res[0], 'hash': res[1]}
+        except sqlite3.IntegrityError as e:
+            print(e, file=sys.stderr)
+            return None
+        except sqlite3.OperationalError as e:
+            print(e, file=sys.stderr)
+            return None
+
+    def addUser(self, id, token, pwhash):
+        try:
+            with self.__connection:
+                self.__cursor.execute('insert into users values(?, ?, ?)', (id, token, pwhash))
+            return True
+        except sqlite3.IntegrityError as e:
+            print(e, file=sys.stderr)
+            return False
 
     def addCipher(self, id, cipher):
         try:
