@@ -19,6 +19,8 @@
   </head>
 
   <script>
+    var authorized = false;
+
     function resetSoft() {
       messageHide();
       $("#username").val("");
@@ -53,36 +55,44 @@
     }
 
     $(document).ready(function(){
+      $("#loginbtn").click(function(e){
+        messageHide();
+        e.preventDefault();
+
+        $.ajax({type: "POST",
+          url: "cgi-bin/api.py/login",
+          data: {
+            username: $("#loginusername").val(),
+            password: $("#loginpassword").val(),
+            token: $("#token").val()
+          },
+          success: function(response){
+            messageInfo("Logged in");
+          },
+          error: function(response){
+            messageError("Server error");
+          }
+        });
+      });
+
       $("#testmasterpassword").click(function(e){
         messageHide();
         e.preventDefault();
 
-        var token = prompt("Enter token:", "");
-        if (token == null || token == "") {
-          messageError("Token is missing");
-          return;
-        }
-
         $.ajax({type: "POST",
-          url: "cgi-bin/getkey.py",
+          url: "cgi-bin/api.py/getkey",
           data: {
-            id: "test",
-            token: token
+            id: "test"
           },
           success: function(response){
-            var result = JSON.parse(response);
-            if (result.status != 0) {
-              messageError("Cannot test master password:" + result.message);
-            } else {
-              openpgp.decrypt({
-                password: $("#masterpassword").val(),
-                message: openpgp.message.readArmored(result.cipher)
-              }).then(function(decrypted){
-                messageInfo("Master password is correct");
-              }).catch(function(error){
-                messageError("Master password is not correct");
-              });
-            }
+            openpgp.decrypt({
+              password: $("#masterpassword").val(),
+              message: openpgp.message.readArmored(response.cipher)
+            }).then(function(decrypted){
+              messageInfo("Master password is correct");
+            }).catch(function(error){
+              messageError("Master password is not correct");
+            });
           },
           error: function(response){
             messageError("Server error");
@@ -221,7 +231,10 @@
 
 <ul class="nav nav-tabs" id="navTabs" role="tablist">
   <li class="nav-item">
-    <a class="nav-link active" id="master-tab" data-toggle="tab" href="#master" role="tab" aria-controls="master" aria-selected="true">Master</a>
+    <a class="nav-link active" id="login-tab" data-toggle="tab" href="#logintab" role="tab" aria-controls="login" aria-selected="true">Login</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" id="master-tab" data-toggle="tab" href="#master" role="tab" aria-controls="master" aria-selected="true">Master</a>
   </li>
   <li class="nav-item">
     <a class="nav-link" id="getkeys-tab" data-toggle="tab" href="#getkeys" role="tab" aria-controls="getkeys" aria-selected="false">Get</a>
@@ -231,7 +244,28 @@
   </li>
 </ul>
 <div class="tab-content" id="navTabContent">
-  <div class="tab-pane fade show active" id="master" role="tabpanel" aria-labelledby="master-tab">
+  <div class="tab-pane fade show active" id="logintab" role="tabpanel" aria-labelledby="login-tab">
+      <form id="loginform" action="javascript:void(0);">
+        <div class="form-group">
+          <label for="loginusername">Username</label>
+          <input type="text" class="form-control" id="loginusername" placeholder="Enter username">
+        </div>
+
+        <div class="form-group">
+          <label for="loginpassword">Password</label>
+          <input type="password" class="form-control" id="loginpassword" placeholder="Enter psw">
+        </div>
+
+        <div class="form-group">
+          <label for="token">Token</label>
+          <input type="text" class="form-control" id="token" placeholder="2FA Token">
+        </div>
+
+        <button id="loginbtn" type="submit" class="btn btn-primary">Login</button>
+      </form>
+  </div>
+
+  <div class="tab-pane fade" id="master" role="tabpanel" aria-labelledby="master-tab">
       <form id="masterpasswordform" action="javascript:void(0);">
         <div class="form-group">
           <label for="masterpassword">Masterpassword</label>
