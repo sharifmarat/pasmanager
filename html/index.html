@@ -19,12 +19,23 @@
   </head>
 
   <script>
-    var authorized = false;
+    var gIsAuthorized = false;
+    var gIsMasterPwChecked = false;
+    var gIsListLoaded = false;
 
     function resetSoft() {
       messageHide();
       $("#username").val("");
       $("#password").val("");
+    }
+
+    function copyToClipboard(text) {
+        var dummy = document.createElement("textarea");
+        document.body.appendChild(dummy);
+        dummy.value = text;
+        dummy.select();
+        document.execCommand("copy");
+        document.body.removeChild(dummy);
     }
 
     function messageHide() {
@@ -51,7 +62,36 @@
 
     function generatePasswordTo(selector) {
       var jen = new Jen(true);
-      $(selector).val(jen.password(30, 40));
+      var newPassword = jen.password(30, 40);
+      copyToClipboard(newPassword);
+      messageInfo("Copied to clipboard");
+      $(selector).val(newPassword);
+    }
+
+    function decodePassword(table_row) {
+      var website = $("#website-" + table_row).text();
+      $.ajax({type: "POST",
+        url: "cgi-bin/api.py/getkey",
+        data: {
+          id: website
+        },
+        success: function(response){
+          openpgp.decrypt({
+            password: $("#masterpassword").val(),
+            message: openpgp.message.readArmored(response.cipher)
+          }).then(function(decrypted){
+            messageInfo("Password decrypted and copied to clipboard");
+            var credentials = JSON.parse(decrypted.data);
+            $("#username-" + table_row).text(credentials.username);
+            copyToClipboard(credentials.password);
+          }).catch(function(error){
+            messageError("Invalid master password");
+          });
+        },
+        error: function(response){
+          messageError("Not logged in");
+        }
+      });
     }
 
     $(document).ready(function(){
@@ -68,14 +108,20 @@
           },
           success: function(response){
             messageInfo("Logged in");
+            gIsAuthorized = true;
           },
           error: function(response){
-            messageError("Server error");
+            messageError("Not logged in");
           }
         });
       });
 
       $("#testmasterpassword").click(function(e){
+        if (!gIsAuthorized) {
+          messageError("Not yet authorized.");
+          return;
+        }
+
         messageHide();
         e.preventDefault();
 
@@ -90,100 +136,14 @@
               message: openpgp.message.readArmored(response.cipher)
             }).then(function(decrypted){
               messageInfo("Master password is correct");
+              gIsMasterPwChecked = true;
             }).catch(function(error){
               messageError("Master password is not correct");
             });
           },
           error: function(response){
-            messageError("Server error");
+            messageError("Not logged in");
           }
-        });
-      });
-    });
-
-    $(document).ready(function(){
-      $("#getpassword").click(function(e){
-        resetSoft();
-        e.preventDefault();
-
-        var token = prompt("Enter token:", "");
-        if (token == null || token == "") {
-          messageError("Token is missing");
-          return;
-        }
-
-        $.ajax({type: "POST",
-          url: "cgi-bin/getkey.py",
-          data: {
-            id: $("#website").val(),
-            token: token
-          },
-          success: function(response){
-            var result = JSON.parse(response);
-            if (result.status != 0) {
-              messageError(result.message);
-            } else {
-              messageInfo(result.message);
-              openpgp.decrypt({
-                password: $("#masterpassword").val(),
-                message: openpgp.message.readArmored(result.cipher)
-              }).then(function(decrypted){
-                var credentials = JSON.parse(decrypted.data);
-                $("#username").val(credentials.username);
-                $("#password").val(credentials.password);
-              }).catch(function(error){
-                messageError("Could not decrypt message");
-              });
-            }
-          },
-          error: function(response){
-            messageError("Server error");
-          }
-        });
-      });
-
-      $("#addpassword").click(function(e){
-        messageHide();
-        e.preventDefault();
-
-        var token = prompt("Enter token:", "");
-        if (token == null || token == "") {
-          messageError("Token is missing");
-          return;
-        }
-
-        var objToEncrypt = {
-          website: $("#website").val,
-          username: $("#username").val(),
-          password: $("#password").val()
-        };
-
-        openpgp.encrypt({
-          data:JSON.stringify(objToEncrypt),
-          passwords:$("#masterpassword").val(),
-          armor: true
-        }).then(function(cipher){
-          $.ajax({type: "POST",
-            url: "cgi-bin/addkey.py",
-            data: {
-              id: $("#website").val(),
-              token: token,
-              cipher: cipher.data
-            },
-            success: function(response){
-              var result = JSON.parse(response);
-              if (result.status != 0) {
-                messageError(result.message);
-              } else {
-                messageInfo(result.message);
-              }
-            },
-            error: function(response){
-              messageError("Server error");
-            }
-          });
-        }).catch(function(error){
-          messageError("Could not encrypt message");
         });
       });
     });
@@ -212,6 +172,116 @@
         }).insertAfter($input);
       });
     });
+
+    $(document).ready(function(){
+      $('#navTabs [href="#getkeys"]').on('shown.bs.tab', function (e) {
+        if (!gIsAuthorized) {
+          messageError("Not yet authorized.");
+          return;
+        }
+        if (!gIsMasterPwChecked) {
+          messageError("No master password yet.");
+          return;
+        }
+
+        if (gIsListLoaded) {
+          return;
+        }
+
+        $.ajax({type: "GET",
+          url: "cgi-bin/api.py/getlist",
+          success: function(response){
+            messageInfo("Received list");
+            for (var i = 0; i < response.length; i++) {
+              $('#list-table').find('tbody')
+                .append($('<tr>')
+                        .append($('<td>')
+                                .append($('<label>')
+                                        .attr('id', 'website-' + i)
+                                        .text(response[i])
+                                        )
+                                )
+                        .append($('<td>')
+                                .append($('<label>')
+                                        .attr('id', 'username-' + i)
+                                        .text('')
+                                        )
+                                )
+                        .append($('<td>')
+                                .append($('<button>')
+                                        .attr('class', 'btn btn-primary')
+                                        .attr('onclick', 'decodePassword(' + i + ')')
+                                        .text('Get')
+                                        )
+                                )
+                        );
+            }
+            gIsListLoaded = true;
+          },
+          error: function(response){
+            messageError("Not logged in");
+          }
+        });
+      });
+    });
+
+    $(document).ready(function(){
+      $("#addpassword").click(function(e){
+
+        if (!gIsAuthorized) {
+          messageError("Not yet authorized.");
+          return;
+        }
+        if (!gIsMasterPwChecked) {
+          messageError("No master password yet.");
+          return;
+        }
+
+        messageHide();
+        e.preventDefault();
+
+        var objToEncrypt = {
+          website: $("#website").val(),
+          username: $("#username").val(),
+          password: $("#password").val()
+        };
+
+        openpgp.encrypt({
+          data:JSON.stringify(objToEncrypt),
+          passwords:$("#masterpassword").val(),
+          armor: true
+        }).then(function(cipher){
+          $.ajax({type: "POST",
+            url: "cgi-bin/api.py/addkey",
+            data: {
+              id: $("#website").val(),
+              cipher: cipher.data
+            },
+            success: function(response){
+              messageInfo("Key has been added");
+            },
+            error: function(response){
+              messageError("Not authorized");
+            }
+          });
+        }).catch(function(error) {
+          messageError("Could not encrypt message");
+        });
+      });
+    });
+
+    window.onload = function() {
+      $.ajax({type: "GET",
+        url: "cgi-bin/api.py",
+        success: function(response){
+          messageInfo("Already logged in");
+          gIsAuthorized = true;
+        },
+        error: function(response){
+          messageInfo("Not logged in");
+        }
+      });
+    };
 
   </script>
 
@@ -278,6 +348,19 @@
   </div>
 
   <div class="tab-pane fade" id="getkeys" role="tabpanel" aria-labelledby="getkeys-tab">
+    <div class="table-responsive">
+      <table class="table" id="list-table" data-search="true">
+        <thead>
+          <tr>
+            <th data-field="list-website" data-sortable="true">Website</th>
+            <th data-field="list-username" data-sortable="true">Username</th>
+            <th>Get+Copy</th>
+          </tr>
+        </thead>
+        <tbody>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <div class="tab-pane fade" id="addkeys" role="tabpanel" aria-labelledby="addkeys-tab">
@@ -303,7 +386,6 @@
         </div>
 
         <p>
-          <input id="getpassword" type="button" value="Get" class="btn btn-primary">
           <input id="addpassword" type="button" value="Add" class="btn btn-primary">
         </p>
       </form>

@@ -86,6 +86,18 @@ def get_key():
             raise BadRequestResponse("Cannot get key")
         return jsonify({'cipher': cipher})
 
+@app.route("/addkey", methods=['POST'])
+def add_key():
+    require_auth()
+    id = request.form.get('id')
+    cipher = request.form.get('cipher')
+
+    db_path = os.environ.get('KEY_DB')
+    with KeyManager(db_path) as db:
+        if not db.addCipher(id, cipher):
+            raise BadRequestResponse("Cannot add key")
+        return "Success"
+
 @app.route("/getlist")
 def get_test():
     require_auth()
